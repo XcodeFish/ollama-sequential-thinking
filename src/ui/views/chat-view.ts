@@ -49,15 +49,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         localResourceRoots: [this._extensionUri]
       };
 
-      // 确保使用WebviewUtils加载HTML内容
+      // 使用新创建的chat-view.html
       console.log('开始调用WebviewUtils.getWebviewContent');
       console.log('extensionUri:', this._extensionUri.fsPath);
-      console.log('模板路径: resources/webview/chat-view.html');
+      console.log('模板路径: resources/webviews/chat-view.html');
 
       webviewView.webview.html = WebviewUtils.getWebviewContent(
         this._extensionUri,
         webviewView.webview,
-        'resources/webview/chat-view.html'
+        'resources/webviews/chat-view.html' // 使用新的模板路径
       );
 
       console.log('WebviewUtils.getWebviewContent 调用完成');
@@ -67,38 +67,41 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // 处理来自WebView的消息
       webviewView.webview.onDidReceiveMessage(async (data) => {
         log(`收到聊天视图消息: ${JSON.stringify(data)}`, 'info');
-        switch (data.type) {
-          case 'send-message':
+        switch (data.command) {
+          case 'sendMessage':
             await this._handleUserMessage(data.message);
           break;
-          case 'clear-chat':
-            this._messages = [];
-            this._updateWebview();
-          break;
-          case 'select-model':
-            // 处理切换模型按钮
-            vscode.commands.executeCommand('ollama-sequential-thinking.selectModel');
-          break;
-          case 'webview-loaded':
-            // 视图加载完成后，自动聚焦到输入框
-            webviewView.webview.postMessage({ type: 'focus-input' });
+          case 'webviewLoaded': {
+            // 视图加载完成后设置初始状态
+            webviewView.webview.postMessage({
+              command: 'updateModel',
+              model: this._client.getDefaultModel()
+            });
+            
+            // 检查连接状态
+            const isConnected = await this._client.ping();
+            webviewView.webview.postMessage({
+              command: 'updateConnectionStatus',
+              isConnected: isConnected
+            });
 
             // 如果是第一次加载，自动显示欢迎消息
             if (this._isFirstLoad) {
               this._isFirstLoad = false;
-              // 添加欢迎消息
-              this._messages.push({
-                role: 'assistant',
-                content: '您好！我是基于Ollama的AI助手，有什么我可以帮助您的吗？'
+              // 添加系统欢迎消息
+              webviewView.webview.postMessage({
+                command: 'addSystemMessage',
+                content: '欢迎使用Ollama助手，请输入您的问题'
               });
-              this._updateWebview();
             }
+            break;
+          }
+          case 'openOptions':
+            vscode.commands.executeCommand('ollama-sequential-thinking.configureModelParams');
           break;
       }
     });
 
-      // 发送已有的消息历史
-      this._updateWebview();
       log('聊天视图初始化完成', 'info');
     } catch (error) {
       log(`聊天视图加载失败: ${error instanceof Error ? error.message : String(error)}`, 'error');
@@ -132,17 +135,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    // 添加用户消息
+    // 添加用户消息到WebView
+    this._view?.webview.postMessage({
+      command: 'addMessage',
+      content: message, // 直接传递原始消息，前端会处理格式化
+      isUser: true
+    });
+
+    // 存储用户消息
     this._messages.push({ role: 'user', content: message });
-    this._updateWebview();
 
     try {
-      // 显示加载状态 - 思考中提示
-      this._view?.webview.postMessage({
-        type: 'model-thinking',
-        content: '正在思考...'
-      });
-
       // 获取配置
       const config = vscode.workspace.getConfiguration('ollama-sequential-thinking');
       const useStreamingOutput = true; // 强制启用流式输出
@@ -151,9 +154,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const model = this._client.getDefaultModel();
 
       if (useStreamingOutput) {
-        // 创建流式响应占位
-        this._messages.push({ role: 'assistant', content: '' });
-        this._updateWebview();
+        // 创建助手消息占位
+        this._view?.webview.postMessage({
+          command: 'addMessage',
+          content: '',
+          isUser: false
+        });
         
         // 调用Ollama API获取流式响应
         try {
@@ -166,7 +172,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               model: model,
-              prompt: `你是一个AI助手，直接回答用户的问题，不要使用分阶段思考。
+              prompt: `你是一个AI助手，专注于提供简洁、清晰的回答，不需要展示思考过程。
+回答编程问题时，直接给出代码示例和解释。
+如果是关于前端开发或React/JSX的问题，请确保提供完整、正确的代码示例，使用Markdown格式的代码块(\`\`\`)并明确指定语言(例如javascript, jsx, typescript等)。
+代码示例应该是实用的、可直接使用的，并附有简短说明。
+避免显示草稿或思考过程。
+
 用户问题: ${message}
 回复:`,
               stream: true,
@@ -188,8 +199,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             throw new Error('无法获取响应流');
           }
           
-          // 更新助手消息的索引
-          const assistantMessageIndex = this._messages.length - 1;
           let fullResponse = '';
           
           // 处理流式响应
@@ -215,13 +224,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                   if (data.response) {
                     fullResponse += data.response;
                     
-                    // 更新消息内容
-                    this._messages[assistantMessageIndex].content = fullResponse;
-                    
-                    // 通知WebView更新内容
+                    // 直接将原始文本发送到前端，由前端处理Markdown和代码高亮
                     this._view?.webview.postMessage({
-                      type: 'appendContent',
-                      content: data.response
+                      command: 'streamResponse',
+                      chunk: data.response
                     });
                   }
                   
@@ -239,57 +245,65 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
               break;
             }
           }
+          
+          // 更新消息内容
+          this._messages.push({ role: 'assistant', content: fullResponse });
+          
+          // 流式响应结束
+          this._view?.webview.postMessage({
+            command: 'endStream'
+          });
+          
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           log(`流式聊天请求失败: ${errorMessage}`, 'error');
           
-          // 更新消息为错误
-          this._messages[this._messages.length - 1] = {
-            role: 'system',
-            content: `错误: ${errorMessage}`
-          };
-          this._updateWebview();
+          // 显示错误消息
+          this._view?.webview.postMessage({
+            command: 'addMessage',
+            content: `错误: ${errorMessage}`,
+            isError: true
+          });
+          
+          // 存储错误消息
+          this._messages.push({ role: 'system', content: `错误: ${errorMessage}` });
         }
       } else {
         // 调用Ollama API获取响应
         const response = await this._client.generate({
           prompt: message,
           model: model,
-          stream: true // 强制启用流式输出
+          stream: false
         });
 
-        // 添加响应消息
+        // 直接发送原始响应，由前端处理Markdown和代码高亮
+        this._view?.webview.postMessage({
+          command: 'addMessage',
+          content: response,
+          isUser: false
+        });
+        
+        // 存储响应消息
         this._messages.push({ role: 'assistant', content: response });
-        this._updateWebview();
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       log(`聊天请求失败: ${errorMessage}`, 'error');
 
-      // 添加错误消息
-      this._messages.push({
-        role: 'system',
-        content: `错误: ${errorMessage}`
+      // 显示错误消息
+      this._view?.webview.postMessage({
+        command: 'addMessage',
+        content: `错误: ${errorMessage}`,
+        isError: true
       });
-
-      this._updateWebview();
-    }
-  }
-
-  /**
-   * 更新WebView内容
-   */
-  private _updateWebview(): void {
-    if (this._view) {
-      this._view.webview.postMessage({
-        type: 'update-messages',
-        messages: this._messages
-      });
+      
+      // 存储错误消息
+      this._messages.push({ role: 'system', content: `错误: ${errorMessage}` });
     }
   }
 }
 
-  /**
+/**
  * 注册聊天视图
  * @param context 扩展上下文
  * @param client Ollama客户端

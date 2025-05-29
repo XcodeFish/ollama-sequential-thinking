@@ -2,12 +2,12 @@
   "name": "ollama-sequential-thinking",
   "displayName": "Ollama Sequential Thinking",
   "description": "VSCode/Cursor插件，集成Ollama本地大模型，实现Sequential-thinking辅助编码",
-  "version": "4.8.8",
+  "version": "4.9.6",
   "publisher": "codefish",
   "icon": "resources/icons/logo.jpg",
   "repository": {
     "type": "git",
-    "url": "https://github.com/codefish-org/ollama-sequential-thinking"
+    "url": "https://github.com/XcodeFish/ollama-sequential-thinking.git"
   },
   "engines": {
     "vscode": "^1.83.0"

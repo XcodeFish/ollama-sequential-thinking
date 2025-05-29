@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline' https://cdn.jsdelivr.net; script-src {{cspSource}} 'nonce-{{nonce}}' https://cdn.jsdelivr.net; img-src {{cspSource}} https:; font-src {{cspSource}};">
+  <title>Ollama 聊天</title>
+  <!-- 添加 highlight.js CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/vs2015.min.css">
+  <style>
+    :root {
+      --container-padding: 20px;
+      --input-padding: 10px;
+      --input-container-height: 100px;
+      /* 输入框区域高度估计 */
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    body {
+      padding: 0;
+      color: var(--vscode-foreground);
+      font-size: var(--vscode-font-size);
+      font-family: var(--vscode-font-family);
+      background-color: var(--vscode-editor-background);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 基础容器样式 */
+    .container {
+      flex: 1;
+      padding: var(--container-padding);
+      overflow-y: auto;
+      overflow-x: hidden;
+      margin-bottom: var(--input-container-height);
+      height: calc(100vh - var(--input-container-height) - 20px);
+      scroll-behavior: smooth;
+    }
+
+    /* 消息容器样式 */
+    .message-container {
+      padding: 8px;
+      margin: 20px 0;
+      border-radius: 4px;
+      background-color: var(--vscode-editor-background);
+      overflow: hidden;
+    }
+
+    .user-message {
+      background-color: var(--vscode-editor-inactiveSelectionBackground);
+      border-left: 3px solid var(--vscode-inputOption-activeBorder);
+      margin-left: 40px;
+      border-radius: 8px 4px 4px 8px;
+    }
+
+    .assistant-message {
+      /* background-color: var(--vscode-editor-selectionBackground); */
+      border-left: 3px solid var(--vscode-activityBarBadge-background);
+      border-radius: 4px;
+    }
+
+    .system-message {
+      background-color: var(--vscode-editorWidget-background);
+      color: var(--vscode-descriptionForeground);
+      border-left: 3px solid var(--vscode-descriptionForeground);
+      font-style: italic;
+      padding: 4px 8px;
+      margin: 4px 0;
+      text-align: center;
+    }
+
+    .error-message {
+      background-color: var(--vscode-errorForeground);
+      color: white;
+      border-left: 3px solid darkred;
+      font-weight: bold;
+    }
+
+    /* 消息元数据样式 */
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--vscode-editorWidget-border);
+    }
+
+    .user-message .message-header {
+      flex-direction: row-reverse;
+    }
+
+    .message-sender {
+      font-weight: bold;
+      color: var(--vscode-editor-foreground);
+    }
+
+    .user-message .message-sender {
+      color: var(--vscode-inputOption-activeForeground);
+    }
+
+    .message-time {
+      font-size: 0.8em;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .message-content {
+      padding: 8px 0;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    /* 代码块基础样式 */
+    .message-content pre {
+      margin: 0.8em 0;
+      border-radius: 4px;
+      overflow: hidden;
+      background-color: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-editorWidget-border);
+      max-width: 100%;
+      white-space: pre-wrap;
+    }
+
+    .message-content pre>code {
+      display: block;
+      padding: 1em;
+      overflow-x: auto;
+      tab-size: 2;
+      font-family: 'Fira Code', Consolas, 'Courier New', monospace;
+      font-size: 0.9em;
+      line-height: 1.4;
+      background-color: var(--vscode-editor-background);
+    }
+
+    /* 代码块头部样式 */
+    .code-block-container {
+      position: relative;
+    }
+
+    .code-block-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 8px;
+      background-color: var(--vscode-editorGroupHeader-tabsBackground);
+      border-bottom: 1px solid var(--vscode-editorWidget-border);
+      font-family: var(--vscode-font-family);
+    }
+
+    .code-block-language {
+      font-size: 0.8em;
+      color: var(--vscode-editorHint-foreground);
+      text-transform: lowercase;
+    }
+
+    /* 复制按钮相关样式 - 已注释
+    .code-block-copy-button {
+      background: none;
+      border: none;
+      color: var(--vscode-button-foreground);
+      background-color: var(--vscode-button-background);
+      font-size: 0.8em;
+      padding: 2px 6px;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    .code-block-copy-button:hover {
+      background-color: var(--vscode-button-hoverBackground);
+    }
+    */
+
+    /* 行内代码样式 */
+    .message-content code:not(pre > code) {
+      padding: 0.2em 0.4em;
+      background: var(--vscode-textCodeBlock-background);
+      border-radius: 3px;
+      font-family: 'Fira Code', Consolas, 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    /* Markdown样式 */
+    .message-content h1,
+    .message-content h2,
+    .message-content h3,
+    .message-content h4,
+    .message-content h5,
+    .message-content h6 {
+      color: var(--vscode-editor-foreground);
+      font-weight: 600;
+      margin-top: 24px;
+      margin-bottom: 16px;
+      line-height: 1.25;
+    }
+
+    .message-content h1 {
+      font-size: 1.5em;
+    }
+
+    .message-content h2 {
+      font-size: 1.3em;
+    }
+
+    .message-content h3 {
+      font-size: 1.15em;
+    }
+
+    .message-content h4 {
+      font-size: 1em;
+    }
+
+    .message-content h5,
+    .message-content h6 {
+      font-size: 0.85em;
+    }
+
+    .message-content p {
+      margin-top: 0;
+      /* margin-bottom: 16px; */
+      line-height: 1.6;
+    }
+
+    .message-content ul,
+    .message-content ol {
+      padding-left: 24px;
+      margin: 8px 0 16px;
+    }
+
+    .message-content li {
+      margin: 4px 0;
+    }
+
+    .message-content a {
+      color: var(--vscode-textLink-foreground);
+      text-decoration: none;
+    }
+
+    .message-content a:hover {
+      text-decoration: underline;
+    }
+
+    .message-content em {
+      font-style: italic;
+    }
+
+    .message-content strong {
+      font-weight: bold;
+    }
+
+    /* 输入区域样式 */
+    .input-container {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px var(--container-padding);
+      background-color: var(--vscode-editor-background);
+      border-top: 1px solid var(--vscode-editorWidget-border);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+      z-index: 100;
+    }
+
+    .input-box {
+      display: flex;
+      width: 100%;
+      align-items: stretch;
+      border-radius: 4px;
+      overflow: hidden;
+      height: 40px !important;
+      border: 1px solid var(--vscode-input-border);
+      background-color: var(--vscode-input-background);
+    }
+
+    .input-textarea {
+      flex: 1;
+      min-height: 40px;
+      max-height: 200px;
+      padding: var(--input-padding);
+      border: none;
+      background-color: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      font-family: var(--vscode-font-family);
+      font-size: var(--vscode-font-size);
+      resize: none;
+      outline: none;
+      overflow-y: auto;
+    }
+
+    .input-textarea:focus {
+      outline: none;
+    }
+
+    .send-button {
+      padding: 0 16px;
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .send-button:hover {
+      background-color: var(--vscode-button-hoverBackground);
+    }
+
+    .input-options {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 0.8em;
+      align-items: center;
+    }
+
+    .model-info {
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .options-button {
+      background: none;
+      border: none;
+      color: var(--vscode-textLink-foreground);
+      cursor: pointer;
+      padding: 0;
+      font-size: 0.8em;
+    }
+
+    .options-button:hover {
+      text-decoration: underline;
+    }
+
+    /* 状态指示器 */
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .status-online {
+      background-color: #3FB950;
+    }
+
+    .status-offline {
+      background-color: #F85149;
+    }
+
+    .loading-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 24px;
+      margin-top: 8px;
+    }
+
+    .loading-dots span {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--vscode-textLink-foreground);
+      margin: 0 3px;
+      animation: pulse 1.2s infinite ease-in-out;
+    }
+
+    .loading-dots span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .loading-dots span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(0.5);
+        opacity: 0.5;
+      }
+
+      50% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* 暗黑主题适配 */
+    .vscode-dark .hljs {
+      background: var(--vscode-editor-background);
+    }
+
+    /* 修复内联代码块显示 */
+    .hljs-inline {
+      display: inline;
+      padding: 0.2em 0.4em;
+    }
+
+    /* 滚动条样式 */
+    .container::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .container::-webkit-scrollbar-track {
+      background: var(--vscode-editor-background);
+    }
+
+    .container::-webkit-scrollbar-thumb {
+      background-color: var(--vscode-scrollbarSlider-background);
+      border-radius: 6px;
+    }
+
+    .container::-webkit-scrollbar-thumb:hover {
+      background-color: var(--vscode-scrollbarSlider-hoverBackground);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container" id="message-container"></div>
+
+  <div class="input-container">
+    <div class="input-box">
+      <textarea id="input-textarea" class="input-textarea" placeholder="输入消息..." rows="1"></textarea>
+      <button id="send-button" class="send-button">发送</button>
+    </div>
+    <div class="input-options">
+      <div class="model-info">
+        <span id="connection-status">
+          <span class="status-indicator status-offline"></span>离线
+        </span>
+        | 模型: <span id="current-model">加载中...</span>
+      </div>
+      <button id="options-button" class="options-button">设置</button>
+    </div>
+    <div id="loading-indicator" class="loading-indicator" style="display: none;">
+      <div class="loading-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引入第三方库 - 使用完整JS而非分开引入 -->
+  <script nonce="{{nonce}}" src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+  <script nonce="{{nonce}}" src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/highlight.min.js"></script>
+  <script nonce="{{nonce}}" src="https://cdn.jsdelivr.net/npm/dompurify@3.0.1/dist/purify.min.js"></script>
+
+  <script nonce="{{nonce}}">
+    (function ()
+    {
+      // 确保highlight.js正确初始化
+      const hljs = window.hljs
+      if (!hljs) {
+        console.error('Highlight.js 未正确加载!')
+      } else {
+        console.log('Highlight.js 已成功加载', hljs.versionString)
+      }
+
+      const vscode = acquireVsCodeApi()
+      let messageHistory = []
+      let currentResponse = '' // 当前响应的累积内容
+      let responseElement = null // 当前响应元素
+
+      // 配置marked
+      marked.setOptions({
+        highlight: function (code, language)
+        {
+          // 添加异常处理以避免渲染失败
+          try {
+            if (language && hljs && hljs.getLanguage) {
+              try {
+                return hljs.highlight(code, { language }).value
+              } catch (err) {
+                console.warn('语法高亮错误:', err)
+              }
+            }
+            return hljs && hljs.highlightAuto ? hljs.highlightAuto(code).value : code
+          } catch (e) {
+            console.error('高亮处理错误:', e)
+            return code
+          }
+        },
+        breaks: true,
+        gfm: true,
+        langPrefix: 'hljs language-'
+      })
+
+      // 添加代码块复制按钮的渲染器
+      try {
+        const renderer = new marked.Renderer()
+        const originalCodeRenderer = renderer.code.bind(renderer)
+
+        renderer.code = function (code, language, isEscaped)
+        {
+          try {
+            const origOutput = originalCodeRenderer(code, language, isEscaped)
+
+            // 检测语言
+            language = language || 'plaintext'
+
+            // 包装代码块 - 已删除复制按钮
+            return `<div class="code-block-container">
+              <div class="code-block-header">
+                <span class="code-block-language">${language}</span>
+              </div>
+              ${origOutput}
+            </div>`
+          } catch (e) {
+            console.error('代码渲染错误:', e)
+            return `<pre><code>${escapeHtml(code)}</code></pre>`
+          }
+        }
+
+        // 更好的处理行内代码
+        const originalInlineCodeRenderer = renderer.codespan.bind(renderer)
+        renderer.codespan = function (code)
+        {
+          try {
+            // 检查是否是JSX等特定语法
+            if (code.includes('JSX') || code.includes('React.') || code.includes('useState') ||
+              code.includes('this.') || code.includes('memo(') || code.includes('<Button')) {
+              // 尝试为常见的React/JSX语法添加高亮
+              try {
+                const highlighted = hljs.highlight(code, { language: 'jsx' }).value
+                return `<code class="hljs hljs-inline language-jsx">${highlighted}</code>`
+              } catch (e) {
+                return originalInlineCodeRenderer(code)
+              }
+            }
+            return originalInlineCodeRenderer(code)
+          } catch (e) {
+            console.error('行内代码渲染错误:', e)
+            return `<code>${escapeHtml(code)}</code>`
+          }
+        }
+
+        marked.use({ renderer })
+      } catch (e) {
+        console.error('marked渲染器初始化失败:', e)
+      }
+
+      // HTML转义函数
+      function escapeHtml (unsafe)
+      {
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;")
+      }
+
+      // 状态指示器
+      const connectionStatus = document.getElementById('connection-status')
+      const currentModel = document.getElementById('current-model')
+      const loadingIndicator = document.getElementById('loading-indicator')
+
+      // 消息容器
+      const messageContainer = document.getElementById('message-container')
+
+      // 输入区域
+      const inputTextarea = document.getElementById('input-textarea')
+      const sendButton = document.getElementById('send-button')
+      const optionsButton = document.getElementById('options-button')
+
+      // 自动调整文本区域高度
+      function adjustTextareaHeight ()
+      {
+        inputTextarea.style.height = 'auto'
+        inputTextarea.style.height = Math.min(inputTextarea.scrollHeight, 200) + 'px'
+      }
+
+      // 添加消息到界面
+      function addMessage (content, isUser = false, isError = false)
+      {
+        const messageDiv = document.createElement('div')
+
+        if (isError) {
+          messageDiv.className = 'message-container error-message'
+          messageDiv.innerHTML = `
+            <div class="message-header">
+              <span class="message-sender">错误</span>
+            </div>
+            <div class="message-content">
+              <div class="error-content">${content}</div>
+            </div>
+          `
+        } else {
+          const messageType = isUser ? 'user-message' : 'assistant-message'
+          const sender = isUser ? '用户' : 'AI助手'
+          const time = new Date().toLocaleTimeString()
+
+          messageDiv.className = `message-container ${messageType}`
+          messageDiv.innerHTML = `
+            <div class="message-header">
+              <span class="message-sender">${sender}</span>
+              <span class="message-time">${time}</span>
+            </div>
+            <div class="message-content">
+              ${isUser ? DOMPurify.sanitize(content) : ''}
+            </div>
+          `
+
+          // 如果是AI响应消息，保存引用以便更新
+          if (!isUser) {
+            responseElement = messageDiv.querySelector('.message-content')
+            currentResponse = ''
+          }
+        }
+
+        messageContainer.appendChild(messageDiv)
+        scrollToBottom()
+
+        // 存储消息历史
+        messageHistory.push({
+          content: content,
+          isUser: isUser,
+          time: new Date().toISOString()
+        })
+      }
+
+      // 滚动到底部
+      function scrollToBottom ()
+      {
+        try {
+          messageContainer.scrollTop = messageContainer.scrollHeight
+        } catch (e) {
+          console.error('滚动到底部失败:', e)
+        }
+      }
+
+      // 添加系统消息
+      function addSystemMessage (content)
+      {
+        const messageDiv = document.createElement('div')
+        messageDiv.className = 'message-container system-message'
+        messageDiv.innerHTML = `<div class="message-content">${content}</div>`
+        messageContainer.appendChild(messageDiv)
+        scrollToBottom()
+      }
+
+      // 复制代码到剪贴板 - 已完全注释掉
+      /*
+      window.copyToClipboard = function(button, encodedCode) {
+        try {
+          const code = decodeURIComponent(encodedCode);
+          
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(code)
+              .then(() => {
+                const originalText = button.textContent;
+                button.textContent = '已复制!';
+                setTimeout(() => {
+                  button.textContent = originalText;
+                }, 2000);
+              })
+              .catch(err => {
+                console.error('无法复制代码: ', err);
+              });
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = code;
+            textarea.style.position = 'fixed';
+            document.body.appendChild(textarea);
+            textarea.select();
+
+            try {
+              document.execCommand('copy');
+              const originalText = button.textContent;
+              button.textContent = '已复制!';
+              setTimeout(() => {
+                button.textContent = originalText;
+              }, 2000);
+            } catch (err) {
+              console.error('无法复制代码: ', err);
+            } finally {
+              document.body.removeChild(textarea);
+            }
+          }
+        } catch (e) {
+          console.error('复制代码错误:', e);
+        }
+      };
+      */
+
+      // 发送消息到扩展
+      function sendMessage ()
+      {
+        const message = inputTextarea.value.trim()
+        if (!message) return
+
+        // 清空输入框并重置高度
+        inputTextarea.value = ''
+        adjustTextareaHeight()
+
+        // 显示加载指示器
+        loadingIndicator.style.display = 'flex'
+
+        // 发送消息到扩展
+        vscode.postMessage({
+          command: 'sendMessage',
+          message: message
+        })
+      }
+
+      // 处理流式响应
+      function processStreamChunk (chunk)
+      {
+        if (!chunk) return
+
+        // 累加响应内容
+        currentResponse += chunk
+
+        // 使用marked渲染Markdown内容
+        if (responseElement) {
+          try {
+            // 改进代码高亮逻辑
+            const sanitizedHtml = DOMPurify.sanitize(marked.parse(currentResponse))
+            responseElement.innerHTML = sanitizedHtml
+
+            // 高亮代码块
+            if (hljs && responseElement.querySelectorAll) {
+              try {
+                responseElement.querySelectorAll('pre code').forEach((block) =>
+                {
+                  if (hljs.highlightElement) {
+                    hljs.highlightElement(block)
+                  }
+                })
+              } catch (e) {
+                console.warn('代码高亮应用失败:', e)
+              }
+            }
+
+            // 自动滚动
+            scrollToBottom()
+          } catch (e) {
+            console.error('处理Markdown时出错', e)
+            // 降级处理：使用简单的HTML转义以确保内容显示
+            responseElement.innerHTML = escapeHtml(currentResponse).replace(/\n/g, '<br>')
+            scrollToBottom()
+          }
+        }
+      }
+
+      // 初始化事件监听器
+      function initListeners ()
+      {
+        // 发送按钮点击
+        sendButton.addEventListener('click', sendMessage)
+
+        // 输入框回车发送（Shift+Enter换行）
+        inputTextarea.addEventListener('keydown', (e) =>
+        {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            sendMessage()
+          }
+        })
+
+        // 自动调整文本区域高度
+        inputTextarea.addEventListener('input', adjustTextareaHeight)
+
+        // 选项按钮点击
+        optionsButton.addEventListener('click', () =>
+        {
+          vscode.postMessage({
+            command: 'openOptions'
+          })
+        })
+
+        // 监听滚动事件，确保滚动正常工作
+        window.addEventListener('resize', () =>
+        {
+          scrollToBottom()
+        })
+
+        // 从扩展接收消息
+        window.addEventListener('message', event =>
+        {
+          const message = event.data
+
+          switch (message.command) {
+            case 'addMessage':
+              // 用户消息只接收后端发送的
+              if (message.isUser || message.isError) {
+                const formattedContent = message.content
+                addMessage(formattedContent, message.isUser, message.isError)
+              }
+              // AI响应创建占位但不添加内容
+              else {
+                addMessage('', message.isUser, message.isError)
+              }
+
+              // 如果是错误消息，隐藏加载指示器
+              if (message.isError) {
+                loadingIndicator.style.display = 'none'
+              }
+              break
+
+            case 'addSystemMessage':
+              addSystemMessage(message.content)
+              break
+
+            case 'updateConnectionStatus':
+              connectionStatus.innerHTML = `
+                <span class="status-indicator ${message.isConnected ? 'status-online' : 'status-offline'}"></span>
+                ${message.isConnected ? '在线' : '离线'}
+              `
+              break
+
+            case 'updateModel':
+              currentModel.textContent = message.model
+              break
+
+            case 'streamResponse':
+              processStreamChunk(message.chunk)
+              break
+
+            case 'endStream':
+              loadingIndicator.style.display = 'none'
+
+              // 流式响应结束，确保所有代码块都高亮
+              if (responseElement && hljs) {
+                try {
+                  responseElement.querySelectorAll('pre code').forEach((block) =>
+                  {
+                    if (hljs.highlightElement) {
+                      hljs.highlightElement(block)
+                    }
+                  })
+                  scrollToBottom()
+                } catch (e) {
+                  console.warn('结束时代码高亮应用失败:', e)
+                }
+              }
+              break
+          }
+        })
+      }
+
+      // 初始化
+      function initialize ()
+      {
+        // 设置事件监听器
+        initListeners()
+
+        // 通知扩展WebView已加载
+        vscode.postMessage({
+          command: 'webviewLoaded'
+        })
+
+        // 确保初始滚动位置正确
+        setTimeout(scrollToBottom, 100)
+      }
+
+      // 启动应用
+      initialize()
+    })();
+  </script>
+</body>
+
+</html>

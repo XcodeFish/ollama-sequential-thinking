@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'nonce-{{nonce}}'; img-src {{cspSource}} https:; font-src {{cspSource}};">
+  <title>Ollama 模型</title>
+  <style>
+    :root {
+      --container-padding: 20px;
+      --input-padding: 10px;
+    }
+
+    body {
+      padding: 0 var(--container-padding);
+      color: var(--vscode-foreground);
+      font-size: var(--vscode-font-size);
+      font-family: var(--vscode-font-family);
+      background-color: var(--vscode-editor-background);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 500;
+      margin-bottom: 1rem;
+      margin-top: 1rem;
+    }
+
+    .model-container {
+      margin-bottom: 1rem;
+    }
+
+    .model-item {
+      background-color: var(--vscode-editor-inactiveSelectionBackground);
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .model-item:hover {
+      background-color: var(--vscode-editor-selectionBackground);
+    }
+
+    .model-name {
+      font-weight: bold;
+    }
+
+    .model-size {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.9em;
+    }
+
+    .model-details {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .button-container {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    button {
+      padding: 8px 12px;
+      margin-left: 8px;
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: var(--vscode-button-hoverBackground);
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .loading-spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-left-color: var(--vscode-progressBar-background);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .error-message {
+      color: var(--vscode-errorForeground);
+      padding: 10px;
+      border: 1px solid var(--vscode-errorForeground);
+      border-radius: 4px;
+    }
+
+    .refresh-button {
+      margin-top: 10px;
+    }
+
+    /* 没有模型时的样式 */
+    .no-models {
+      text-align: center;
+      padding: 20px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    /* 模型操作菜单 */
+    .model-actions {
+      position: relative;
+    }
+
+    .model-action-menu {
+      background-color: var(--vscode-dropdown-background);
+      border: 1px solid var(--vscode-dropdown-border);
+      border-radius: 2px;
+      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+      position: absolute;
+      z-index: 100;
+      right: 0;
+      top: 100%;
+      display: none;
+    }
+
+    .model-action-menu.visible {
+      display: block;
+    }
+
+    .model-action-item {
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .model-action-item:hover {
+      background-color: var(--vscode-list-hoverBackground);
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Ollama 模型管理</h1>
+
+  <div id="loading" class="loading">
+    <div class="loading-spinner"></div>
+    <span>加载模型中...</span>
+  </div>
+
+  <div id="error" class="error-message" style="display: none;">
+    无法连接到 Ollama 服务，请检查服务是否运行。
+    <div>
+      <button id="retry-button" class="refresh-button">重试</button>
+    </div>
+  </div>
+
+  <div id="models-container" class="model-container" style="display: none;"></div>
+
+  <div id="no-models" class="no-models" style="display: none;">
+    <p>没有找到已安装的模型</p>
+    <button id="install-button">安装模型</button>
+  </div>
+
+  <div class="button-container">
+    <button id="refresh-button">刷新</button>
+    <button id="download-button">下载模型</button>
+  </div>
+
+  <!-- 模型操作菜单模板 -->
+  <div id="model-action-menu-template" class="model-action-menu">
+    <div class="model-action-item" data-action="select">设为默认</div>
+    <div class="model-action-item" data-action="info">查看信息</div>
+    <div class="model-action-item" data-action="delete">删除模型</div>
+  </div>
+
+  <script nonce="{{nonce}}">
+    (function ()
+    {
+      const vscode = acquireVsCodeApi()
+
+      // 初始化状态
+      const state = {
+        models: [],
+        defaultModel: null
+      }
+
+      // 元素引用
+      const loadingElem = document.getElementById('loading')
+      const errorElem = document.getElementById('error')
+      const modelsContainerElem = document.getElementById('models-container')
+      const noModelsElem = document.getElementById('no-models')
+      const refreshButton = document.getElementById('refresh-button')
+      const retryButton = document.getElementById('retry-button')
+      const downloadButton = document.getElementById('download-button')
+      const installButton = document.getElementById('install-button')
+
+      // 加载模型
+      function loadModels ()
+      {
+        showLoading()
+
+        // 向插件发送消息请求模型列表
+        vscode.postMessage({
+          command: 'getModels'
+        })
+      }
+
+      // 显示加载中状态
+      function showLoading ()
+      {
+        loadingElem.style.display = 'flex'
+        errorElem.style.display = 'none'
+        modelsContainerElem.style.display = 'none'
+        noModelsElem.style.display = 'none'
+      }
+
+      // 显示错误状态
+      function showError ()
+      {
+        loadingElem.style.display = 'none'
+        errorElem.style.display = 'block'
+        modelsContainerElem.style.display = 'none'
+        noModelsElem.style.display = 'none'
+      }
+
+      // 显示模型列表
+      function showModels (models)
+      {
+        loadingElem.style.display = 'none'
+        errorElem.style.display = 'none'
+
+        if (!models || models.length === 0) {
+          modelsContainerElem.style.display = 'none'
+          noModelsElem.style.display = 'block'
+          return
+        }
+
+        modelsContainerElem.style.display = 'block'
+        noModelsElem.style.display = 'none'
+
+        // 渲染模型列表
+        modelsContainerElem.innerHTML = ''
+        models.forEach(model =>
+        {
+          const modelElem = createModelElement(model)
+          modelsContainerElem.appendChild(modelElem)
+        })
+      }
+
+      // 创建模型元素
+      function createModelElement (model)
+      {
+        const modelDiv = document.createElement('div')
+        modelDiv.className = 'model-item'
+        modelDiv.dataset.model = model.name
+
+        // 格式化模型大小
+        const sizeStr = formatModelSize(model.size || 0)
+
+        const isDefaultModel = model.name === state.defaultModel
+
+        modelDiv.innerHTML = `
+          <div class="model-details">
+            <div class="model-name">${model.name}${isDefaultModel ? ' (默认)' : ''}</div>
+            <div class="model-size">${sizeStr}</div>
+          </div>
+          <div class="button-container">
+            ${isDefaultModel ?
+            '<button class="select-button" disabled>已默认</button>' :
+            '<button class="select-button">设为默认</button>'
+          }
+            <button class="action-button">...</button>
+          </div>
+        `
+
+        // 添加选择模型事件
+        const selectButton = modelDiv.querySelector('.select-button')
+        if (selectButton && !selectButton.disabled) {
+          selectButton.addEventListener('click', () =>
+          {
+            selectModel(model.name)
+          })
+        }
+
+        // 添加更多操作事件
+        const actionButton = modelDiv.querySelector('.action-button')
+        actionButton.addEventListener('click', (e) =>
+        {
+          showModelActionMenu(e, model)
+        })
+
+        return modelDiv
+      }
+
+      // 格式化模型大小
+      function formatModelSize (bytes)
+      {
+        if (bytes === 0) return '未知大小'
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+        const i = Math.floor(Math.log(bytes) / Math.log(1024))
+        return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`
+      }
+
+      // 显示模型操作菜单
+      function showModelActionMenu (event, model)
+      {
+        // 关闭所有已打开的菜单
+        hideAllModelActionMenus()
+
+        // 克隆菜单模板
+        const menuTemplate = document.getElementById('model-action-menu-template')
+        const menu = menuTemplate.cloneNode(true)
+        menu.id = `model-menu-${model.name.replace(/[^a-zA-Z0-9]/g, '-')}`
+        menu.classList.add('visible')
+
+        // 添加到目标按钮旁边
+        const buttonRect = event.target.getBoundingClientRect()
+        menu.style.top = `${buttonRect.bottom}px`
+        menu.style.right = `${window.innerWidth - buttonRect.right}px`
+
+        document.body.appendChild(menu)
+
+        // 添加菜单项事件
+        menu.querySelectorAll('.model-action-item').forEach(item =>
+        {
+          item.addEventListener('click', () =>
+          {
+            const action = item.dataset.action
+            switch (action) {
+              case 'select':
+                selectModel(model.name)
+                break
+              case 'info':
+                showModelInfo(model)
+                break
+              case 'delete':
+                deleteModel(model.name)
+                break
+            }
+            hideAllModelActionMenus()
+          })
+        })
+
+        // 点击其他区域关闭菜单
+        document.addEventListener('click', hideAllModelActionMenus, { once: true })
+      }
+
+      // 隐藏所有模型操作菜单
+      function hideAllModelActionMenus ()
+      {
+        document.querySelectorAll('.model-action-menu.visible').forEach(menu =>
+        {
+          if (menu.id !== 'model-action-menu-template') {
+            menu.remove()
+          }
+        })
+      }
+
+      // 设置默认模型
+      function selectModel (modelName)
+      {
+        vscode.postMessage({
+          command: 'selectModel',
+          modelName: modelName
+        })
+      }
+
+      // 显示模型信息
+      function showModelInfo (model)
+      {
+        vscode.postMessage({
+          command: 'showModelInfo',
+          model: model
+        })
+      }
+
+      // 删除模型
+      function deleteModel (modelName)
+      {
+        if (confirm(`确定要删除模型 "${modelName}" 吗？`)) {
+          vscode.postMessage({
+            command: 'deleteModel',
+            modelName: modelName
+          })
+        }
+      }
+
+      // 下载模型
+      function downloadModel ()
+      {
+        vscode.postMessage({
+          command: 'downloadModel'
+        })
+      }
+
+      // 监听按钮点击事件
+      refreshButton.addEventListener('click', () =>
+      {
+        loadModels()
+      })
+
+      retryButton.addEventListener('click', () =>
+      {
+        loadModels()
+      })
+
+      downloadButton.addEventListener('click', () =>
+      {
+        downloadModel()
+      })
+
+      installButton.addEventListener('click', () =>
+      {
+        downloadModel()
+      })
+
+      // 监听来自插件的消息
+      window.addEventListener('message', event =>
+      {
+        const message = event.data
+
+        switch (message.command) {
+          case 'setModels':
+            state.models = message.models
+            state.defaultModel = message.defaultModel
+            showModels(message.models)
+            break
+
+          case 'error':
+            showError()
+            break
+
+          case 'updateStatus':
+            // 处理状态更新
+            if (message.status === 'loading') {
+              showLoading()
+            }
+            break
+
+          case 'modelSelected':
+            // 更新默认模型
+            state.defaultModel = message.modelName
+            showModels(state.models)
+            break
+        }
+      })
+
+      // 首次加载
+      loadModels()
+    }());
+  </script>
+</body>
+
+</html>

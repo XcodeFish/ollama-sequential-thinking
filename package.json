@@ -1,0 +1,225 @@
+{
+  "name": "ollama-sequential-thinking",
+  "displayName": "Ollama Sequential Thinking",
+  "description": "VSCode/Cursor插件，集成Ollama本地大模型，实现Sequential-thinking辅助编码",
+  "version": "4.8.8",
+  "publisher": "codefish",
+  "icon": "resources/icons/logo.jpg",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codefish-org/ollama-sequential-thinking"
+  },
+  "engines": {
+    "vscode": "^1.83.0"
+  },
+  "vscePackageOptions": {
+    "skipIcons": true
+  },
+  "categories": [
+    "Other",
+    "Programming Languages",
+    "Machine Learning"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:ollama-sequential-thinking.chatView",
+    "onCommand:ollama-sequential-thinking.openChatView"
+  ],
+  "main": "./out/src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ollama-sequential-thinking.askQuestion",
+        "title": "Ollama: 提问(Sequential-thinking)"
+      },
+      {
+        "command": "ollama-sequential-thinking.generateCode",
+        "title": "Ollama: 生成代码(Sequential-thinking)"
+      },
+      {
+        "command": "ollama-sequential-thinking.selectModel",
+        "title": "Ollama: 选择模型"
+      },
+      {
+        "command": "ollama-sequential-thinking.configureModelParams",
+        "title": "Ollama: 配置模型参数"
+      },
+      {
+        "command": "ollama-sequential-thinking.openChatView",
+        "title": "Ollama: 打开聊天界面"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ollama-sequential-thinking",
+          "title": "Ollama助手",
+          "icon": "resources/icons/logo.svg"
+        }
+      ]
+    },
+    "views": {
+      "ollama-sequential-thinking": [
+        {
+          "id": "ollama-sequential-thinking.chatView",
+          "name": "Ollama聊天",
+          "type": "webview",
+          "when": "true",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "ollama-sequential-thinking.selectModel",
+          "when": "view == ollama-sequential-thinking.chatView",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "ollama-sequential-thinking.askQuestion",
+          "group": "ollama"
+        },
+        {
+          "command": "ollama-sequential-thinking.generateCode",
+          "group": "ollama"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "ollama-sequential-thinking.askQuestion"
+        },
+        {
+          "command": "ollama-sequential-thinking.generateCode"
+        },
+        {
+          "command": "ollama-sequential-thinking.selectModel"
+        },
+        {
+          "command": "ollama-sequential-thinking.configureModelParams"
+        },
+        {
+          "command": "ollama-sequential-thinking.openChatView"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "ollama-sequential-thinking.askQuestion",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      },
+      {
+        "command": "ollama-sequential-thinking.generateCode",
+        "key": "ctrl+shift+g",
+        "mac": "cmd+shift+g"
+      }
+    ],
+    "configuration": {
+      "title": "Ollama Sequential Thinking",
+      "properties": {
+        "ollama-sequential-thinking.apiEndpoint": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama API 端点"
+        },
+        "ollama-sequential-thinking.defaultModel": {
+          "type": "string",
+          "default": "deepseek-coder:1.3b",
+          "description": "默认使用的 Ollama 模型"
+        },
+        "ollama-sequential-thinking.maxTokens": {
+          "type": "number",
+          "default": 2048,
+          "description": "生成响应的最大 token 数"
+        },
+        "ollama-sequential-thinking.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "description": "生成响应的随机性 (0.0-1.0)"
+        },
+        "ollama-sequential-thinking.topP": {
+          "type": "number",
+          "default": 0.9,
+          "description": "Top-P采样参数 (0.0-1.0)"
+        },
+        "ollama-sequential-thinking.topK": {
+          "type": "number",
+          "default": 40,
+          "description": "Top-K采样参数"
+        },
+        "ollama-sequential-thinking.maxHistoryItems": {
+          "type": "number",
+          "default": 50,
+          "description": "保存的最大历史记录数量"
+        },
+        "ollama-sequential-thinking.useStreamingOutput": {
+          "type": "boolean",
+          "default": true,
+          "description": "使用流式输出响应"
+        },
+        "ollama-sequential-thinking.enableOfflineCache": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用离线缓存，保存最近的响应"
+        },
+        "ollama-sequential-thinking.cacheMaxItems": {
+          "type": "number",
+          "default": 20,
+          "description": "离线缓存的最大条目数"
+        }
+      }
+    }
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "@types/*",
+        "eslint-*",
+        "jest",
+        "prettier",
+        "typescript",
+        "mocha",
+        "chai",
+        "nyc",
+        "tape"
+      ]
+    },
+    "neverBuiltDependencies": [
+      "fsevents"
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "pnpm run compile && pnpm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "npx @vscode/vsce package --no-dependencies",
+    "build": "pnpm run compile && pnpm run package"
+  },
+  "dependencies": {
+    "axios": "^1.9.0",
+    "marked": "^11.0.0",
+    "marked-terminal": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/marked": "^5.0.1",
+    "@types/marked-terminal": "^6.0.0",
+    "@types/mocha": "^10.0.4",
+    "@types/node": "20.9.0",
+    "@types/vscode": "^1.83.0",
+    "@typescript-eslint/eslint-plugin": "^6.11.0",
+    "@typescript-eslint/parser": "^6.11.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.4.2",
+    "eslint": "^8.53.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.2.0",
+    "typescript": "^5.2.2"
+  }
+}

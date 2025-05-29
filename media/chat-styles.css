@@ -1,0 +1,501 @@
+/* 现代化聊天界面样式 */
+:root {
+  --primary-color: #3f67ff;
+  --primary-light: #eef1ff;
+  --primary-dark: #2a4cdd;
+  --secondary-color: #6c757d;
+  --light-bg: #f8f9fa;
+  --dark-bg: #252a36;
+  --text-color: #343a40;
+  --text-light: #6c757d;
+  --border-color: #dee2e6;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --success-color: #28a745;
+  --error-color: #dc3545;
+  --warning-color: #ffc107;
+  --code-bg: #f5f5f5;
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --border-radius: 6px;
+  --animation-speed: 0.3s;
+}
+
+/* 强制所有元素水平方向显示 */
+*, *::before, *::after {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+
+/* 针对中文文本和代码特殊处理 */
+html, body, div, span, p, pre, code, a, h1, h2, h3, h4, h5, h6, 
+li, ol, ul, table, thead, tbody, tr, th, td, input, textarea, button {
+  writing-mode: horizontal-tb !important; 
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 特别处理代码和预格式文本 */
+pre, code, .code-content, .code-block {
+  font-family: monospace !important;
+  white-space: pre !important;
+  text-align: left !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  font-variant-east-asian: normal;
+  text-transform: none;
+  overflow-x: auto;
+}
+
+/* 暗色主题适配 */
+.vscode-dark {
+  --light-bg: #2d3748;
+  --dark-bg: #1a202c;
+  --text-color: #f8f9fa;
+  --text-light: #cbd5e0;
+  --border-color: #4a5568;
+  --code-bg: #2d3748;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  line-height: 1.6;
+  color: var(--text-color);
+  background-color: var(--light-bg);
+  font-size: 14px;
+}
+
+/* 应用容器 */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 头部样式 */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1.2rem;
+  background-color: var(--dark-bg);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 5px var(--shadow-color);
+  z-index: 10;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.app-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.app-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: white;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.model-selector {
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background-color: var(--light-bg);
+  color: var(--text-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--animation-speed);
+  outline: none;
+}
+
+.model-selector:hover, 
+.model-selector:focus {
+  border-color: var(--primary-color);
+}
+
+.icon-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--border-radius);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--animation-speed);
+}
+
+.icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.clear-button .icon {
+  font-size: 1.2rem;
+  color: white;
+}
+
+/* 聊天容器 */
+.chat-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background-color: var(--light-bg);
+}
+
+.chat-messages {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* 欢迎信息 */
+.welcome-message {
+  background-color: var(--primary-light);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  text-align: center;
+  margin-bottom: 1rem;
+  border-left: 4px solid var(--primary-color);
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.welcome-message h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: var(--primary-dark);
+}
+
+.welcome-message p {
+  margin-bottom: 0.5rem;
+}
+
+.welcome-message code {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-family: monospace;
+  color: var(--primary-dark);
+}
+
+/* 消息气泡 */
+.message {
+  display: flex;
+  gap: 1rem;
+  max-width: 90%;
+}
+
+.message.user {
+  align-self: flex-end;
+}
+
+.message.assistant {
+  align-self: flex-start;
+}
+
+.message-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.message.user .message-avatar {
+  background-color: var(--secondary-color);
+}
+
+.message-content {
+  background-color: white;
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  box-shadow: 0 2px 5px var(--shadow-color);
+  position: relative;
+  min-width: 100px;
+  max-width: calc(100% - 50px);
+}
+
+.message.user .message-content {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.message.assistant .message-content {
+  background-color: white;
+  color: var(--text-color);
+}
+
+.message-text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* 思考步骤 */
+.thinking-steps {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.5rem;
+}
+
+.thinking-step {
+  margin-bottom: 0.8rem;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.step-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.step-content {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  padding-left: 1.2rem;
+  border-left: 2px solid var(--primary-light);
+}
+
+/* 代码块 */
+.code-block {
+  position: relative;
+  margin: 0.8rem 0;
+  background-color: var(--code-bg);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background-color: rgba(0, 0, 0, 0.05);
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
+.code-language {
+  font-weight: 600;
+}
+
+.code-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.code-action-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--primary-color);
+  font-size: 0.8rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  transition: all var(--animation-speed);
+}
+
+.code-action-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.code-content {
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* 输入区域 */
+.input-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.8rem;
+  padding: 1rem;
+  background-color: var(--light-bg);
+  border-top: 1px solid var(--border-color);
+  z-index: 10;
+}
+
+.question-input {
+  flex: 1;
+  padding: 0.8rem 1rem;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background-color: white;
+  color: var(--text-color);
+  font-family: var(--font-family);
+  font-size: 0.95rem;
+  resize: none;
+  outline: none;
+  transition: all var(--animation-speed);
+}
+
+.question-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(63, 103, 255, 0.1);
+}
+
+.send-button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--animation-speed);
+}
+
+.send-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.send-button .icon {
+  font-size: 1.2rem;
+}
+
+.send-button.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* 加载动画 */
+.loading-indicator {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--primary-light);
+  border-radius: 50%;
+  border-top-color: var(--primary-color);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .chat-messages {
+    padding: 1rem;
+  }
+  
+  .message {
+    max-width: 100%;
+  }
+  
+  .app-title {
+    font-size: 1rem;
+  }
+}
+
+/* 代码高亮 */
+.code-highlight {
+  color: var(--primary-dark);
+}
+
+.code-keyword {
+  color: #d73a49;
+}
+
+.code-string {
+  color: #032f62;
+}
+
+.code-comment {
+  color: #6a737d;
+}
+
+/* 状态提示 */
+.status-indicator {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* 错误信息 */
+.error-message {
+  background-color: rgba(220, 53, 69, 0.1);
+  color: var(--error-color);
+  padding: 0.8rem;
+  border-radius: var(--border-radius);
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  border-left: 3px solid var(--error-color);
+}
+
+/* 思考中动画 */
+.thinking-indicator {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+
+.thinking-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--primary-color);
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: pulse 1.4s infinite ease-in-out;
+}
+
+.thinking-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(0.7); opacity: 0.5; }
+  50% { transform: scale(1); opacity: 1; }
+} 

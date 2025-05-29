@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'nonce-{{nonce}}'; img-src {{cspSource}} https: data:;">
+  <title>Ollama聊天</title>
+  <style>
+    /* 全局强制水平文本样式 */
+    html,
+    body,
+    div,
+    span,
+    applet,
+    object,
+    iframe,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    blockquote,
+    pre,
+    a,
+    abbr,
+    acronym,
+    address,
+    big,
+    cite,
+    code,
+    del,
+    dfn,
+    em,
+    img,
+    ins,
+    kbd,
+    q,
+    s,
+    samp,
+    small,
+    strike,
+    strong,
+    sub,
+    sup,
+    tt,
+    var,
+    b,
+    u,
+    i,
+    center,
+    dl,
+    dt,
+    dd,
+    ol,
+    ul,
+    li,
+    fieldset,
+    form,
+    label,
+    legend,
+    table,
+    caption,
+    tbody,
+    tfoot,
+    thead,
+    tr,
+    th,
+    td,
+    article,
+    aside,
+    canvas,
+    details,
+    embed,
+    figure,
+    figcaption,
+    footer,
+    header,
+    hgroup,
+    menu,
+    nav,
+    output,
+    ruby,
+    section,
+    summary,
+    time,
+    mark,
+    audio,
+    video {
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed !important;
+      direction: ltr !important;
+      unicode-bidi: isolate !important;
+    }
+
+    /* 防止垂直文本溢出 */
+    * {
+      overflow-wrap: break-word;
+      word-break: break-word;
+      max-width: 100%;
+    }
+
+    /* 最基础的样式 */
+    * {
+      box-sizing: border-box;
+      word-break: break-word;
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed !important;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--vscode-editor-foreground);
+      background-color: var(--vscode-editor-background);
+      direction: ltr !important;
+      writing-mode: horizontal-tb !important;
+    }
+
+    .container {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .messages {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 10px;
+      writing-mode: horizontal-tb !important;
+    }
+
+    /* 强制内容水平显示 */
+    .message {
+      display: block !important;
+      width: 100% !important;
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      text-align: left;
+      white-space: normal !important;
+      word-wrap: break-word;
+      direction: ltr !important;
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed !important;
+      unicode-bidi: isolate !important;
+    }
+
+    .message * {
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed !important;
+      direction: ltr !important;
+      unicode-bidi: isolate !important;
+    }
+
+    .message>div,
+    .message>p,
+    .message>span {
+      display: block !important;
+      text-align: left !important;
+      white-space: normal !important;
+      width: 100% !important;
+      word-wrap: break-word !important;
+      direction: ltr !important;
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed !important;
+    }
+
+    .user {
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      margin-left: auto;
+      text-align: left;
+    }
+
+    .assistant {
+      background-color: var(--vscode-editor-inactiveSelectionBackground);
+      margin-right: auto;
+    }
+
+    .system {
+      background-color: var(--vscode-editorWarning-background);
+      color: var(--vscode-editorWarning-foreground);
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    /* 输入区域 */
+    .input-area {
+      display: flex;
+      padding: 10px;
+      border-top: 1px solid var(--vscode-editorWidget-border);
+    }
+
+    textarea {
+      flex-grow: 1;
+      padding: 8px;
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 4px;
+      background-color: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      resize: none;
+      height: 36px;
+      min-height: 36px;
+      max-height: 36px;
+    }
+
+    button {
+      margin-left: 8px;
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      height: 36px;
+    }
+
+    /* 代码块基础样式 - 简化 */
+    pre {
+      background-color: #1E1E1E;
+      border: 1px solid #333;
+      border-radius: 3px;
+      padding: 10px;
+      margin: 10px 0;
+      overflow-x: auto;
+      direction: ltr !important;
+      text-align: left !important;
+      white-space: pre !important;
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed !important;
+      unicode-bidi: isolate !important;
+    }
+
+    code {
+      font-family: 'Courier New', Courier, monospace;
+      display: block;
+      white-space: pre !important;
+      direction: ltr !important;
+      text-align: left !important;
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed !important;
+      unicode-bidi: isolate !important;
+    }
+
+    /* 思考动画 */
+    .thinking-dots:after {
+      content: '.';
+      animation: dots 1.5s steps(5, end) infinite;
+    }
+
+    @keyframes dots {
+
+      0%,
+      20% {
+        content: '.';
+      }
+
+      40% {
+        content: '..';
+      }
+
+      60% {
+        content: '...';
+      }
+
+      80%,
+      100% {
+        content: '';
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="messages" id="message-container">
+      <div class="message system" style="text-align:left; width:100%; display:block;">
+        <div style="text-align:left; width:100%; display:block;">欢迎使用Ollama聊天功能，您可以在下方输入框中提问。</div>
+      </div>
+    </div>
+    <div class="input-area">
+      <textarea id="message-input" placeholder="输入您的问题..."></textarea>
+      <button id="send-button">发送</button>
+    </div>
+  </div>
+
+  <script nonce="{{nonce}}">
+    (function ()
+    {
+      const vscode = acquireVsCodeApi()
+      const messageContainer = document.getElementById('message-container')
+      const messageInput = document.getElementById('message-input')
+      const sendButton = document.getElementById('send-button')
+
+      // 基础功能
+      sendButton.addEventListener('click', sendMessage)
+      messageInput.addEventListener('keydown', e =>
+      {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          sendMessage()
+        }
+      })
+
+      function sendMessage ()
+      {
+        const message = messageInput.value.trim()
+        if (message) {
+          vscode.postMessage({ type: 'send-message', message })
+          messageInput.value = ''
+        }
+      }
+
+      // 消息处理
+      window.addEventListener('message', event =>
+      {
+        const data = event.data
+
+        switch (data.type) {
+          case 'update-messages':
+            updateMessages(data.messages)
+            break
+          case 'model-thinking':
+            showThinking(data.content)
+            break
+          case 'appendContent':
+            appendMessage(data.content)
+            break
+          case 'focus-input':
+            messageInput.focus()
+            break
+        }
+      })
+
+      // 创建消息元素
+      function createMessageElement (role)
+      {
+        const element = document.createElement('div')
+        element.className = `message ${role}`
+
+        // 只设置必要的属性，不添加内部HTML结构
+        element.setAttribute('dir', 'ltr')
+        element.style.cssText = 'display:block !important; width:100% !important; text-align:left !important; white-space:normal !important; direction:ltr !important; writing-mode:horizontal-tb !important; text-orientation:mixed !important; unicode-bidi:isolate !important;'
+
+        return element
+      }
+
+      // 显示思考状态
+      function showThinking (content)
+      {
+        let thinkingEl = document.querySelector('.message.thinking')
+
+        if (!thinkingEl) {
+          thinkingEl = createMessageElement('assistant thinking')
+          thinkingEl.innerHTML = '<div style="display:block; text-align:left; width:100%; white-space:normal; direction:ltr !important; writing-mode:horizontal-tb !important; text-orientation:mixed !important; unicode-bidi:isolate !important;">' + content + '<span class="thinking-dots"></span></div>'
+          messageContainer.appendChild(thinkingEl)
+        }
+
+        messageContainer.scrollTop = messageContainer.scrollHeight
+      }
+
+      // 添加用户消息
+      function addUserMessage (message)
+      {
+        const element = createMessageElement('user')
+        element.innerHTML = '<div style="text-align:left; width:100%; display:block; direction:ltr !important; writing-mode:horizontal-tb !important; text-orientation:mixed !important; unicode-bidi:isolate !important;">' + message + '</div>'
+        messageContainer.appendChild(element)
+        scrollToBottom()
+      }
+
+      // 简化的更新所有消息
+      function updateMessages (messages)
+      {
+        messageContainer.innerHTML = ''
+
+        messages.forEach(msg =>
+        {
+          const msgEl = createMessageElement(msg.role)
+          const content = msg.content || ''
+
+          // 直接设置内容，不做复杂处理
+          msgEl.innerHTML = '<div dir="ltr" style="display:block !important; text-align:left !important; width:100% !important; direction:ltr !important; writing-mode:horizontal-tb !important; text-orientation:mixed !important; unicode-bidi:isolate !important;">' + content + '</div>'
+
+          messageContainer.appendChild(msgEl)
+        })
+
+        // 滚动到底部
+        messageContainer.scrollTop = messageContainer.scrollHeight
+      }
+
+      // 简化的追加消息内容
+      function appendMessage (content)
+      {
+        const messages = messageContainer.querySelectorAll('.message')
+        if (!messages.length) return
+
+        let lastMsg = messages[messages.length - 1]
+
+        // 处理思考状态
+        if (lastMsg.classList.contains('thinking')) {
+          lastMsg.classList.remove('thinking')
+          lastMsg.innerHTML = ''
+
+          // 创建内容容器
+          const contentDiv = document.createElement('div')
+          contentDiv.setAttribute('dir', 'ltr')
+          contentDiv.style.cssText = 'display:block !important; text-align:left !important; width:100% !important; direction:ltr !important; writing-mode:horizontal-tb !important; text-orientation:mixed !important; unicode-bidi:isolate !important;'
+          lastMsg.appendChild(contentDiv)
+        }
+
+        // 获取或创建内容容器
+        let contentDiv = lastMsg.querySelector('div')
+        if (!contentDiv) {
+          contentDiv = document.createElement('div')
+          contentDiv.setAttribute('dir', 'ltr')
+          contentDiv.style.cssText = 'display:block !important; text-align:left !important; width:100% !important; direction:ltr !important; writing-mode:horizontal-tb !important; text-orientation:mixed !important; unicode-bidi:isolate !important;'
+          lastMsg.appendChild(contentDiv)
+        }
+
+        // 追加内容而不是替换
+        contentDiv.innerHTML += content
+
+        // 滚动到底部
+        messageContainer.scrollTop = messageContainer.scrollHeight
+      }
+
+      // 滚动到底部
+      function scrollToBottom ()
+      {
+        messageContainer.scrollTop = messageContainer.scrollHeight
+      }
+
+      // 通知扩展已加载
+      window.addEventListener('load', () =>
+      {
+        vscode.postMessage({ type: 'webview-loaded' })
+      })
+    })();
+  </script>
+</body>
+
+</html>

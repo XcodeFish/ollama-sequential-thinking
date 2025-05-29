@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'nonce-{{nonce}}'; img-src {{cspSource}} https:; font-src {{cspSource}};">
+  <title>Ollama 历史记录</title>
+  <style>
+    :root {
+      --container-padding: 20px;
+      --input-padding: 10px;
+    }
+
+    body {
+      padding: 0 var(--container-padding);
+      color: var(--vscode-foreground);
+      font-size: var(--vscode-font-size);
+      font-family: var(--vscode-font-family);
+      background-color: var(--vscode-editor-background);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 500;
+      margin-bottom: 1rem;
+      margin-top: 1rem;
+    }
+
+    .history-container {
+      margin-bottom: 1rem;
+    }
+
+    .history-item {
+      background-color: var(--vscode-editor-inactiveSelectionBackground);
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .history-item:hover {
+      background-color: var(--vscode-editor-selectionBackground);
+    }
+
+    .history-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .history-item-title {
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 70%;
+    }
+
+    .history-item-time {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.8em;
+    }
+
+    .history-item-model {
+      color: var(--vscode-descriptionForeground);
+      font-size: 0.9em;
+      margin-bottom: 4px;
+    }
+
+    .history-item-summary {
+      color: var(--vscode-foreground);
+      font-size: 0.9em;
+      opacity: 0.9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .button-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+
+    button {
+      padding: 8px 12px;
+      margin-left: 8px;
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: var(--vscode-button-hoverBackground);
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .loading-spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-left-color: var(--vscode-progressBar-background);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .empty-history {
+      text-align: center;
+      padding: 20px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .history-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .search-container {
+      display: flex;
+      align-items: center;
+      background-color: var(--vscode-input-background);
+      border-radius: 4px;
+      padding: 0 10px;
+    }
+
+    .search-input {
+      border: none;
+      background: transparent;
+      color: var(--vscode-input-foreground);
+      padding: 8px;
+      width: 200px;
+      outline: none;
+    }
+
+    .search-input::placeholder {
+      color: var(--vscode-input-placeholderForeground);
+    }
+
+    .clear-search {
+      background: none;
+      border: none;
+      color: var(--vscode-descriptionForeground);
+      cursor: pointer;
+      padding: 0;
+      margin-left: 5px;
+    }
+
+    .clear-search:hover {
+      color: var(--vscode-foreground);
+    }
+
+    .history-item-selected {
+      border-left: 3px solid var(--vscode-button-background);
+    }
+  </style>
+</head>
+
+<body>
+  <h1>思考历史记录</h1>
+
+  <div class="history-actions">
+    <div class="search-container">
+      <input type="text" id="search-input" class="search-input" placeholder="搜索历史..." />
+      <button id="clear-search" class="clear-search">✕</button>
+    </div>
+    <button id="refresh-button">刷新</button>
+  </div>
+
+  <div id="loading" class="loading">
+    <div class="loading-spinner"></div>
+    <span>加载历史记录中...</span>
+  </div>
+
+  <div id="history-container" class="history-container" style="display: none;"></div>
+
+  <div id="empty-history" class="empty-history" style="display: none;">
+    <p>暂无历史记录</p>
+  </div>
+
+  <div class="button-container">
+    <button id="clear-history-button">清空历史</button>
+  </div>
+
+  <script nonce="{{nonce}}">
+    (function ()
+    {
+      const vscode = acquireVsCodeApi()
+
+      // 初始化状态
+      const state = {
+        historyItems: [],
+        filteredItems: [],
+        selectedItemId: null
+      }
+
+      // 元素引用
+      const loadingElem = document.getElementById('loading')
+      const historyContainerElem = document.getElementById('history-container')
+      const emptyHistoryElem = document.getElementById('empty-history')
+      const refreshButton = document.getElementById('refresh-button')
+      const clearHistoryButton = document.getElementById('clear-history-button')
+      const searchInput = document.getElementById('search-input')
+      const clearSearch = document.getElementById('clear-search')
+
+      // 加载历史记录
+      function loadHistory ()
+      {
+        showLoading()
+
+        // 向插件发送消息请求历史记录
+        vscode.postMessage({
+          command: 'getHistory'
+        })
+      }
+
+      // 显示加载中状态
+      function showLoading ()
+      {
+        loadingElem.style.display = 'flex'
+        historyContainerElem.style.display = 'none'
+        emptyHistoryElem.style.display = 'none'
+      }
+
+      // 显示历史记录
+      function showHistory (historyItems)
+      {
+        loadingElem.style.display = 'none'
+
+        if (!historyItems || historyItems.length === 0) {
+          historyContainerElem.style.display = 'none'
+          emptyHistoryElem.style.display = 'block'
+          return
+        }
+
+        historyContainerElem.style.display = 'block'
+        emptyHistoryElem.style.display = 'none'
+
+        // 渲染历史记录
+        historyContainerElem.innerHTML = ''
+        historyItems.forEach(item =>
+        {
+          const historyElem = createHistoryElement(item)
+          historyContainerElem.appendChild(historyElem)
+        })
+      }
+
+      // 创建历史记录元素
+      function createHistoryElement (historyItem)
+      {
+        const historyDiv = document.createElement('div')
+        historyDiv.className = 'history-item'
+        historyDiv.dataset.id = historyItem.id
+
+        if (historyItem.id === state.selectedItemId) {
+          historyDiv.classList.add('history-item-selected')
+        }
+
+        // 格式化时间
+        const date = new Date(historyItem.timestamp)
+        const formattedTime = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+
+        historyDiv.innerHTML = `
+          <div class="history-item-header">
+            <div class="history-item-title">${historyItem.question.substring(0, 50)}${historyItem.question.length > 50 ? '...' : ''}</div>
+            <div class="history-item-time">${formattedTime}</div>
+          </div>
+          <div class="history-item-model">模型: ${historyItem.model || '未知'}</div>
+          <div class="history-item-summary">${historyItem.result.substring(0, 100)}${historyItem.result.length > 100 ? '...' : ''}</div>
+        `
+
+        // 添加点击事件
+        historyDiv.addEventListener('click', () =>
+        {
+          selectHistoryItem(historyItem)
+        })
+
+        return historyDiv
+      }
+
+      // 选择历史记录项
+      function selectHistoryItem (historyItem)
+      {
+        state.selectedItemId = historyItem.id
+
+        // 更新UI
+        document.querySelectorAll('.history-item').forEach(elem =>
+        {
+          if (elem.dataset.id === historyItem.id) {
+            elem.classList.add('history-item-selected')
+          } else {
+            elem.classList.remove('history-item-selected')
+          }
+        })
+
+        // 发送消息到插件
+        vscode.postMessage({
+          command: 'selectHistoryItem',
+          historyItem: historyItem
+        })
+      }
+
+      // 搜索历史记录
+      function searchHistory (query)
+      {
+        if (!query || query.trim() === '') {
+          state.filteredItems = state.historyItems
+          showHistory(state.historyItems)
+          return
+        }
+
+        query = query.toLowerCase()
+        state.filteredItems = state.historyItems.filter(item =>
+        {
+          return item.question.toLowerCase().includes(query) ||
+            item.result.toLowerCase().includes(query)
+        })
+
+        showHistory(state.filteredItems)
+      }
+
+      // 清空历史记录
+      function clearHistory ()
+      {
+        if (confirm('确定要清空所有历史记录吗？此操作无法撤销。')) {
+          vscode.postMessage({
+            command: 'clearHistory'
+          })
+        }
+      }
+
+      // 监听按钮点击事件
+      refreshButton.addEventListener('click', () =>
+      {
+        loadHistory()
+      })
+
+      clearHistoryButton.addEventListener('click', () =>
+      {
+        clearHistory()
+      })
+
+      // 监听搜索
+      searchInput.addEventListener('input', () =>
+      {
+        searchHistory(searchInput.value)
+      })
+
+      clearSearch.addEventListener('click', () =>
+      {
+        searchInput.value = ''
+        searchHistory('')
+      })
+
+      // 监听来自插件的消息
+      window.addEventListener('message', event =>
+      {
+        const message = event.data
+
+        switch (message.command) {
+          case 'setHistory':
+            state.historyItems = message.history
+            state.filteredItems = message.history
+            showHistory(message.history)
+            break
+
+          case 'historyCleared':
+            state.historyItems = []
+            state.filteredItems = []
+            showHistory([])
+            break
+
+          case 'historyItemAdded':
+            // 处理新增历史记录
+            state.historyItems.unshift(message.historyItem)
+            searchHistory(searchInput.value) // 重新应用搜索过滤
+            break
+        }
+      })
+
+      // 首次加载
+      loadHistory()
+    }());
+  </script>
+</body>
+
+</html>

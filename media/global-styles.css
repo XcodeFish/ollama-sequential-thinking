@@ -1,0 +1,75 @@
+/* 全局样式 - 确保所有文本和代码水平显示 */
+
+/* 所有元素强制水平文本方向 */
+*, *::before, *::after {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important; 
+}
+
+/* HTML基本元素 */
+html, body, div, span, applet, object, iframe,
+h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+a, abbr, acronym, address, big, cite, code,
+del, dfn, em, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var,
+b, u, i, center,
+dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend,
+table, caption, tbody, tfoot, thead, tr, th, td,
+article, aside, canvas, details, embed,
+figure, figcaption, footer, header, hgroup,
+menu, nav, output, ruby, section, summary,
+time, mark, audio, video {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+}
+
+/* 特别处理代码相关元素 */
+pre, code, kbd, samp, tt {
+  font-family: monospace !important;
+  white-space: pre !important;
+  text-align: left !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  font-variant-east-asian: normal;
+  text-transform: none;
+}
+
+/* 代码块容器 */
+.code-block, pre, .code-content {
+  display: block !important;
+  width: 100% !important;
+  overflow-x: auto;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  white-space: pre !important;
+  text-align: left !important;
+}
+
+/* 代码内部文本 */
+.code-block *, pre *, code * {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  white-space: pre !important;
+  text-align: left !important;
+  font-variant-east-asian: normal;
+  text-transform: none;
+}
+
+/* 确保中文显示正确 */
+:lang(zh), :lang(zh-CN), [lang="zh"], [lang="zh-CN"] {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+} 

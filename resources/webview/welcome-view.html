@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'nonce-{{nonce}}'; img-src {{cspSource}} https: data:;">
+  <title>欢迎使用</title>
+  <style>
+    /* 全局文本布局控制 */
+    *,
+    *::before,
+    *::after {
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed !important;
+      direction: ltr !important;
+      unicode-bidi: isolate !important;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      padding: 15px;
+      color: var(--vscode-editor-foreground);
+      text-align: center;
+    }
+
+    h2 {
+      margin-top: 0;
+      color: var(--vscode-button-background);
+      margin-bottom: 20px;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin: 0 auto;
+      max-width: 500px;
+    }
+
+    .card {
+      background-color: var(--vscode-editor-inactiveSelectionBackground);
+      border-radius: 6px;
+      padding: 15px;
+      text-align: left;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .logo {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 20px;
+      display: block;
+    }
+
+    button {
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background-color: var(--vscode-button-hoverBackground);
+    }
+
+    .feature-list {
+      list-style-type: none;
+      padding-left: 0;
+      margin-top: 10px;
+    }
+
+    .feature-list li {
+      margin-bottom: 8px;
+      position: relative;
+      padding-left: 24px;
+    }
+
+    .feature-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--vscode-button-background);
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>欢迎使用 Ollama AI助手</h2>
+    <img src="https://ollama.ai/public/ollama.png" alt="Ollama Logo" class="logo">
+    <div class="card">
+      <h3>开始使用</h3>
+      <p>Ollama Sequential Thinking扩展已激活，点击下面的按钮开始使用本地AI辅助功能。</p>
+      <button id="start-button">开始聊天</button>
+    </div>
+    <div class="card">
+      <h3>功能特点</h3>
+      <ul class="feature-list">
+        <li>集成本地Ollama大语言模型</li>
+        <li>Sequential Thinking思考模式</li>
+        <li>代码生成与修改</li>
+        <li>本地运行，完全保护隐私</li>
+        <li>多种预设模板，提高效率</li>
+      </ul>
+    </div>
+  </div>
+  <script nonce="{{nonce}}">
+    (function ()
+    {
+      const vscode = acquireVsCodeApi()
+      document.getElementById('start-button').addEventListener('click', () =>
+      {
+        vscode.postMessage({ command: 'openChat' })
+      })
+      window.addEventListener('message', (event) =>
+      {
+        const message = event.data
+      })
+    })();
+  </script>
+</body>
+
+</html>

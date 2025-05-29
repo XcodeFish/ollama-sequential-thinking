@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'nonce-{{nonce}}'; img-src {{cspSource}} https: data:;">
+  <title>历史记录</title>
+  <style>
+    body {
+      padding: 0;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      color: var(--vscode-editor-foreground);
+      background-color: var(--vscode-editor-background);
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .header h2 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .clear-button {
+      background-color: var(--vscode-errorForeground);
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .history-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .history-item {
+      padding: 10px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+
+    .history-item:hover {
+      background-color: var(--vscode-list-hoverBackground);
+      cursor: pointer;
+    }
+
+    .history-question {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .history-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--vscode-descriptionForeground);
+    }
+
+    .empty-message {
+      text-align: center;
+      margin: 20px 0;
+      font-style: italic;
+      color: var(--vscode-descriptionForeground);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>思考历史记录</h2>
+      <button class="clear-button" id="clear-button">清空历史</button>
+    </div>
+    <div id="history-container">
+      <div class="empty-message">暂无历史记录</div>
+    </div>
+  </div>
+
+  <script nonce="{{nonce}}">
+    (function ()
+    {
+      const vscode = acquireVsCodeApi()
+      const clearButton = document.getElementById('clear-button')
+      const historyContainer = document.getElementById('history-container')
+
+      // 初始化
+      vscode.postMessage({ type: 'get-history' })
+
+      // 清空历史按钮点击事件
+      clearButton.addEventListener('click', () =>
+      {
+        if (confirm('确定要清空所有历史记录吗？')) {
+          vscode.postMessage({ type: 'clear-history' })
+        }
+      })
+
+      // 处理来自扩展的消息
+      window.addEventListener('message', event =>
+      {
+        const message = event.data
+        if (message.type === 'history') {
+          renderHistory(message.history)
+        }
+      })
+
+      // 渲染历史记录
+      function renderHistory (history)
+      {
+        if (!history || history.length === 0) {
+          historyContainer.innerHTML = '<div class="empty-message">暂无历史记录</div>'
+          return
+        }
+
+        let html = '<ul class="history-list">'
+        history.forEach(item =>
+        {
+          const date = new Date(item.timestamp)
+          const formattedDate = formatDate(date)
+
+          html += `
+            <li class="history-item" data-id="${item.id}">
+              <div class="history-question">${escapeHtml(item.question)}</div>
+              <div class="history-meta">
+                <span>${item.model || '未知模型'}</span>
+                <span>${formattedDate}</span>
+              </div>
+            </li>
+          `
+        })
+        html += '</ul>'
+
+        historyContainer.innerHTML = html
+
+        // 添加历史项点击事件
+        document.querySelectorAll('.history-item').forEach(item =>
+        {
+          item.addEventListener('click', () =>
+          {
+            const id = item.dataset.id
+            vscode.postMessage({ type: 'show-history-item', id })
+          })
+        })
+      }
+
+      // 格式化日期
+      function formatDate (date)
+      {
+        const now = new Date()
+        const diff = now.getTime() - date.getTime()
+        const day = 24 * 60 * 60 * 1000
+
+        if (diff < day) {
+          return '今天 ' + date.getHours().toString().padStart(2, '0') + ':' +
+            date.getMinutes().toString().padStart(2, '0')
+        } else if (diff < 2 * day) {
+          return '昨天 ' + date.getHours().toString().padStart(2, '0') + ':' +
+            date.getMinutes().toString().padStart(2, '0')
+        } else {
+          return date.getFullYear() + '/' +
+            (date.getMonth() + 1).toString().padStart(2, '0') + '/' +
+            date.getDate().toString().padStart(2, '0')
+        }
+      }
+
+      // HTML转义
+      function escapeHtml (unsafe)
+      {
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;")
+      }
+    })();
+  </script>
+</body>
+
+</html>
